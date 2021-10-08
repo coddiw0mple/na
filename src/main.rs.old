@@ -1,0 +1,75 @@
+//! Sodium is a next generation Vi-like editor.
+
+extern crate termion;
+
+use termion::event::Key;
+use termion::input::TermRead;
+use termion::raw::{IntoRawMode, RawTerminal};
+use std::io::{Write, stdout, stdin, Stdout};
+
+fn editor_draw_rows(stdout:&mut RawTerminal<Stdout>) {
+
+    write!(stdout, "{}{}", termion::cursor::Save, termion::cursor::Goto(1,1)).unwrap();
+    let (_x,y) = termion::terminal_size().unwrap();
+    for _i in 1..y {
+        write!(stdout, "~\r\n").expect("Failed to create tildes");
+    }
+    write!(stdout, "{}", termion::cursor::Restore).unwrap();
+}
+
+fn editor_refresh_screen(stdout:&mut RawTerminal<Stdout>, buffer: &String){
+    write!(stdout, "{}{}{}",termion::clear::All,
+                            termion::cursor::Goto(4,1),
+                            buffer).unwrap();
+
+    editor_draw_rows(stdout);
+}
+
+
+fn editor_process_keypress(stdout:&mut RawTerminal<Stdout>) {
+
+    let mut buffer = String::new();
+    // Get the standard input stream.
+    let stdin = stdin();
+    editor_refresh_screen(stdout, &buffer);
+
+    for c in stdin.keys() {
+        // Print the key we type...
+        match c.unwrap() {
+            // Exit.
+            Key::Char('\n') => buffer.push_str("\r\n~  "),
+            Key::Ctrl('q') => break,
+            Key::Char(c)   => buffer.push_str(&c.to_string()),
+            Key::Left      => write!(stdout, "{}", termion::cursor::Left(2)).unwrap(),
+            Key::Right     => write!(stdout, "{}", termion::cursor::Right(1)).unwrap(),
+            Key::Up        => write!(stdout, "{}", termion::cursor::Up(1)).unwrap(),
+            Key::Down      => write!(stdout, "{}", termion::cursor::Down(1)).unwrap(),
+            Key::Backspace => buffer.push_str("\x08 \x08"),
+            _              => print!("Other"),
+        }
+
+        editor_refresh_screen(stdout, &buffer);
+
+        // Flush again.
+        stdout.flush().unwrap();
+    }
+}
+
+fn main() {
+    // Get the standard output stream and go to raw mode.
+    let mut stdout = stdout().into_raw_mode().unwrap();
+    write!(stdout, "{}{}",
+           // Clear the screen.
+           termion::clear::All,
+           // Goto (1,1).
+           termion::cursor::Goto(1, 1)).unwrap();
+    // Flush stdout (i.e. make the output appear).
+    stdout.flush().unwrap();
+
+    loop {
+        editor_process_keypress(&mut stdout);
+        break;
+    }
+
+    write!(stdout, "{}", termion::clear::All).unwrap();
+}
