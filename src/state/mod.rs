@@ -1,12 +1,12 @@
 /// The global editor state.
 use termion::event::Key;
-
-use crate::terminal::Terminal;
-use crate::Document;
+use std::env;
 
 pub mod document;
 pub mod line;
 
+use crate::terminal::Terminal;
+use crate::Document;
 use crate::Line;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -29,16 +29,26 @@ pub struct Editor {
     terminal: Terminal,
     cur_pos: Position,
     document: Document,
+    offset: Position,
 }
 
 impl Editor {
 
     pub fn default() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let document = if args.len() > 1 {
+            let file_name = &args[1];
+            Document::open(&file_name).unwrap_or_default()
+        } else {
+            Document::default()
+        };
+
         Self {
             quit: false,
             terminal: Terminal::new().expect("Failed to initialize terminal :("),
             cur_pos: Position::default(),
-            document: Document::open(),
+            document,
+            offset: Position::default(),
         }
     }
 
@@ -64,7 +74,10 @@ impl Editor {
             println!("Goodbye!\r");
         } else {
             self.draw_lines();
-            Terminal::cursor_pos(&self.cur_pos);
+            Terminal::cursor_pos(&Position {
+                x: self.cur_pos.x.saturating_sub(self.offset.x),
+                y: self.cur_pos.y.saturating_sub(self.offset.y),
+            });
         }
         Terminal::cursor_show();
         Terminal::flush()
@@ -85,14 +98,33 @@ impl Editor {
             | Key::Home=> self.move_cursor(key),
             _ => (),
         };
-
+        self.scroll();
         Ok(())
+    }
+
+    fn scroll(&mut self) {
+        let Position{ x, y} = self.cur_pos;
+        let width = self.terminal.size().width as usize;
+        let height = self.terminal.size().height as usize;
+        let mut offset = &mut self.offset;
+
+        if y < offset.y {
+            offset.y = y;
+        } else if y >= offset.y.saturating_add(height) {
+            offset.y = y.saturating_sub(height).saturating_add(1);
+        }
+        if x < offset.x {
+            offset.x = x;
+        } else if x >= offset.x.saturating_add(width) {
+            offset.x = x.saturating_sub(width).saturating_add(1);
+        }
+
     }
 
     fn move_cursor(&mut self, key: Key) {
         let Position { mut y, mut x } = self.cur_pos;
         let size = self.terminal.size();
-        let height = size.height.saturating_sub(1) as usize;
+        let height = self.document.len();
         let width = size.width.saturating_sub(1) as usize;
 
         match key {
@@ -110,7 +142,7 @@ impl Editor {
             }
             Key::PageUp => y = 0,
             Key::PageDown => y = height,
-            Key::Home => x = 0,
+            Key::Home => x = 1,
             Key::End => x = width,
             _ => (),
         }
@@ -147,11 +179,12 @@ impl Editor {
     }
 
     fn draw_line(&self, line: &Line) {
-        let start = 0;
-        let end = self.terminal.size().width as usize;
+        let width = self.terminal.size().width as usize;
+        let start = self.offset.x;
+        let end = self.offset.x + width;
 
         let line = line.render(start, end);
-        println!("{}\r", line);
+        println!(" {}\r", line);
     }
 
     fn draw_lines(&self) {
@@ -160,9 +193,9 @@ impl Editor {
         for term_line in 0..height - 1 {
             Terminal::clear_current_line();
 
-            if let Some(line) = self.document.line(term_line as usize) {
+            if let Some(line) = self.document.line(term_line as usize + self.offset.y) {
                 self.draw_line(line);
-            } else if term_line == height/3 {
+            } else if self.document.is_empty() && term_line == height/3 {
                 self.process_welcome();
             } else {
                 println!("~\r");
