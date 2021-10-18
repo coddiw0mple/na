@@ -1,6 +1,9 @@
 /// The global editor state.
 use termion::event::Key;
 use std::env;
+use std::time::Duration;
+use std::time::Instant;
+use termion::color;
 
 pub mod document;
 pub mod line;
@@ -10,12 +13,28 @@ use crate::Document;
 use crate::Line;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
+const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 
 pub enum State {
     Normal,
     Replace,
     Insert,
     Prompt,
+}
+
+struct StatusMessage {
+    text: String,
+    time: Instant,
+}
+
+impl StatusMessage {
+    fn from(message: String) -> Self {
+        Self {
+            time: Instant::now(),
+            text: message,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -30,15 +49,24 @@ pub struct Editor {
     cur_pos: Position,
     document: Document,
     offset: Position,
+    status_message: StatusMessage,
 }
 
 impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
+        let mut initial_status = String::from(" HELP: Esc = quit");
+
         let document = if args.len() > 1 {
             let file_name = &args[1];
-            Document::open(&file_name).unwrap_or_default()
+            let doc = Document::open(&file_name);
+            if doc.is_ok() {
+                doc.unwrap()
+            } else {
+                initial_status = format!("ERR: Could not open file: {}", file_name);
+                Document::default()
+            }
         } else {
             Document::default()
         };
@@ -49,6 +77,7 @@ impl Editor {
             cur_pos: Position::default(),
             document,
             offset: Position::default(),
+            status_message: StatusMessage::from(initial_status),
         }
     }
 
@@ -74,6 +103,8 @@ impl Editor {
             println!("Goodbye!\r");
         } else {
             self.draw_lines();
+            self.draw_status_bar();
+            self.draw_message_bar();
             Terminal::cursor_pos(&Position {
                 x: self.cur_pos.x.saturating_sub(self.offset.x),
                 y: self.cur_pos.y.saturating_sub(self.offset.y),
@@ -81,6 +112,47 @@ impl Editor {
         }
         Terminal::cursor_show();
         Terminal::flush()
+    }
+
+    fn draw_status_bar(&self) {
+        let mut status;
+        let width = self.terminal.size().width as usize;
+        let mut filename = "[untitled]".to_string();
+
+        if let Some(name) = &self.document.filename {
+            filename = name.clone();
+            filename.truncate(20);
+        }
+
+        status = format!(" {} - {} lines", filename, self.document.len());
+        let line_indicator = format!(
+            "{}/{}",
+            self.cur_pos.y.saturating_add(1),
+            self.document.len()
+        );
+        let len = status.len() + line_indicator.len();
+        if width > len {
+            status.push_str(&" ".repeat(width - len - 2));
+        }
+
+        status = format!("{}{}  ", status, line_indicator);
+        status.truncate(width);
+
+        Terminal::set_bg_color(STATUS_BG_COLOR);
+        Terminal::set_fg_color(STATUS_FG_COLOR);
+        println!("{}\r", status);
+        Terminal::reset_bg_color();
+        Terminal::reset_fg_color();
+    }
+
+    fn draw_message_bar(&self) {
+        Terminal::clear_current_line();
+        let message = &self.status_message;
+        if Instant::now() - message.time < Duration::new(5, 0) {
+            let mut text = message.text.clone();
+            text.truncate(self.terminal.size().width as usize);
+            print!("{}", text);
+        }
     }
 
     fn process_insert_keypress(&mut self) -> Result<(), std::io::Error> {
@@ -122,10 +194,14 @@ impl Editor {
     }
 
     fn move_cursor(&mut self, key: Key) {
+        let terminal_height = self.terminal.size().height as usize;
         let Position { mut y, mut x } = self.cur_pos;
-        let size = self.terminal.size();
         let height = self.document.len();
-        let width = size.width.saturating_sub(1) as usize;
+        let mut width = if let Some(line) = self.document.line(y) {
+            line.len() + 1
+        } else {
+            0
+        };
 
         match key {
             Key::Up => y = y.saturating_sub(1),
@@ -134,18 +210,54 @@ impl Editor {
                     y = y.saturating_add(1);
                 }
             }
-            Key::Left => x = x.saturating_sub(1),
+            Key::Left => {
+                if x > 0 {
+                    x -= 1;
+                } else if y > 0 {
+                    y -= 1;
+                    if let Some(line) = self.document.line(y) {
+                        x = line.len() + 1;
+                    } else {
+                        x = 0;
+                    }
+                }
+            },
             Key::Right => {
                 if x < width {
-                    x = x.saturating_add(1);
+                    x += 1;
+                } else if y < height {
+                    y += 1;
+                    x = 0;
                 }
-            }
-            Key::PageUp => y = 0,
-            Key::PageDown => y = height,
+            },
+            Key::PageUp => {
+                y = if y > terminal_height {
+                    y - terminal_height
+                } else {
+                    0
+                }
+            },
+            Key::PageDown => {
+                y = if y.saturating_add(terminal_height) < height {
+                    y + terminal_height as usize
+                } else {
+                    height
+                }
+            },
             Key::Home => x = 1,
             Key::End => x = width,
             _ => (),
         }
+        width = if let Some(line) = self.document.line(y) {
+            line.len()
+        } else {
+            0
+        };
+
+        if x > width + 1 {
+            x = width + 1;
+        }
+
         self.cur_pos = Position {x, y};
     }
 
@@ -190,7 +302,7 @@ impl Editor {
     fn draw_lines(&self) {
         let height = self.terminal.size().height;
 
-        for term_line in 0..height - 1 {
+        for term_line in 0..height {
             Terminal::clear_current_line();
 
             if let Some(line) = self.document.line(term_line as usize + self.offset.y) {

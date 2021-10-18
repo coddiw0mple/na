@@ -4,10 +4,11 @@ use std::fs;
 #[derive(Default)]
 pub struct Document {
     lines: Vec<Line>,
+    pub filename: Option<String>,
 }
 
 impl Document {
-    pub fn open(filename: &str ) -> Result<Self, std::io::Error> {
+    pub fn open(filename: &str) -> Result<Self, std::io::Error> {
         let data = fs::read_to_string(filename)?;
         let mut lines = Vec::new();
 
@@ -15,7 +16,10 @@ impl Document {
             lines.push(Line::from(value));
         }
 
-        Ok(Self { lines })
+        Ok(Self {
+            lines,
+            filename: Some(filename.to_string()),
+        })
     }
 
     pub fn line(&self, index: usize) -> Option<&Line> {

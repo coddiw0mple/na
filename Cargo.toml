@@ -11,3 +11,4 @@ Sodium: A modern vi-like editor
 
 [dependencies]
 termion = "*"
+unicode-segmentation = "*"
