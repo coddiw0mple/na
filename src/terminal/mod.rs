@@ -55,7 +55,7 @@ impl Terminal {
     }
 
     pub fn cursor_pos(position: &Position) {
-        let Position{mut x, mut y} = position;
+        let Position{x, y} = position;
         let x = x.saturating_add(1);
         let y = y.saturating_add(1);
         print!("{}", termion::cursor::Goto(x as u16, y as u16));

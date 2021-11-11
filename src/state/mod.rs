@@ -56,7 +56,7 @@ impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from(" HELP: Esc = quit");
+        let mut initial_status = String::from(" HELP: Ctrl-s = save | Esc = quit");
 
         let document = if args.len() > 1 {
             let file_name = &args[1];
@@ -65,7 +65,7 @@ impl Editor {
                 doc.unwrap()
             } else {
                 initial_status = format!("ERR: Could not open file: {}", file_name);
-                Document::default()
+                Document::new(file_name)
             }
         } else {
             Document::default()
@@ -160,6 +160,31 @@ impl Editor {
 
         match key {
             Key::Esc => self.quit = true,
+            Key::Char(c) => {
+                self.document.insert(&self.cur_pos, c);
+
+                self.move_cursor(Key::Right);
+            },
+            Key::Delete => self.document.delete(&self.cur_pos),
+            Key::Backspace => {
+                if self.cur_pos.x > 0 || self.cur_pos.y > 0 {
+                    self.move_cursor(Key::Left);
+                    self.document.delete(&self.cur_pos);
+                }
+            }
+            Key::Ctrl('s') => {
+                if self.document.filename.is_none() {
+                    self.document.filename = Some(self.prompt("Save as: ", false)?);
+                } else if self.document.new == true {
+                    self.document.filename = Some(self.prompt("Save as: ", true)?);
+                }
+
+                if self.document.save().is_ok() {
+                    self.status_message = StatusMessage::from("File saved successfully.".to_string());
+                } else {
+                    self.status_message = StatusMessage::from("Error writing file!".to_string());
+                }
+            }
             Key::Up
             | Key::Down
             | Key::Left
@@ -172,6 +197,29 @@ impl Editor {
         };
         self.scroll();
         Ok(())
+    }
+
+    fn prompt(&mut self, prompt: &str, new: bool) -> Result<String, std::io::Error> {
+        let mut result = String::new();
+
+        if new {
+            result = String::from(self.document.filename.as_ref().unwrap());
+        }
+        loop {
+            self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
+            self.refresh_screen()?;
+            if let Key::Char(c) = Terminal::read_key()? {
+                if c == '\n' {
+                    self.status_message = StatusMessage::from(String::new());
+                    break;
+                }
+                if !c.is_control() {
+                    result.push(c);
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn scroll(&mut self) {
@@ -216,14 +264,14 @@ impl Editor {
                 } else if y > 0 {
                     y -= 1;
                     if let Some(line) = self.document.line(y) {
-                        x = line.len() + 1;
+                        x = line.len();
                     } else {
                         x = 0;
                     }
                 }
             },
             Key::Right => {
-                if x < width {
+                if x < width.saturating_sub(1) {
                     x += 1;
                 } else if y < height {
                     y += 1;
@@ -296,7 +344,7 @@ impl Editor {
         let end = self.offset.x + width;
 
         let line = line.render(start, end);
-        println!(" {}\r", line);
+        println!("{}\r", line);
     }
 
     fn draw_lines(&self) {
