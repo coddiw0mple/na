@@ -172,19 +172,7 @@ impl Editor {
                     self.document.delete(&self.cur_pos);
                 }
             }
-            Key::Ctrl('s') => {
-                if self.document.filename.is_none() {
-                    self.document.filename = Some(self.prompt("Save as: ", false)?);
-                } else if self.document.new == true {
-                    self.document.filename = Some(self.prompt("Save as: ", true)?);
-                }
-
-                if self.document.save().is_ok() {
-                    self.status_message = StatusMessage::from("File saved successfully.".to_string());
-                } else {
-                    self.status_message = StatusMessage::from("Error writing file!".to_string());
-                }
-            }
+            Key::Ctrl('s') => self.save(),
             Key::Up
             | Key::Down
             | Key::Left
@@ -199,27 +187,61 @@ impl Editor {
         Ok(())
     }
 
-    fn prompt(&mut self, prompt: &str, new: bool) -> Result<String, std::io::Error> {
+    fn save(&mut self) {
+        if self.document.filename.is_none() {
+            let new_name = self.prompt("Save as: ").unwrap_or(None);
+            if new_name.is_none() {
+                self.status_message = StatusMessage::from("Save aborted.".to_string());
+                return;
+            }
+            self.document.filename = new_name;
+        } else if self.document.name == true {
+            self.document.filename = self.prompt("Save as: ").unwrap_or(None);
+        }
+
+        if self.document.save().is_ok() {
+            self.status_message = StatusMessage::from("File saved successfully.".to_string());
+        } else {
+            self.status_message = StatusMessage::from("Error writing file!".to_string());
+        }
+    }
+
+    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
         let mut result = String::new();
 
-        if new {
+        if self.document.name {
             result = String::from(self.document.filename.as_ref().unwrap());
         }
         loop {
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
             self.refresh_screen()?;
-            if let Key::Char(c) = Terminal::read_key()? {
-                if c == '\n' {
-                    self.status_message = StatusMessage::from(String::new());
+
+
+            match Terminal::read_key()? {
+                Key::Char('\n') => break,
+                Key::Char(c) => {
+                    if !c.is_control() {
+                        result.push(c);
+                    }
+                },
+                Key::Backspace => {
+                    if result.len() > 0 {
+                        result.remove(result.len() - 1);
+                    }
+                }
+                Key::Esc => {
+                    result.truncate(0);
                     break;
                 }
-                if !c.is_control() {
-                    result.push(c);
-                }
+                _ => (),
             }
         }
 
-        Ok(result)
+        self.status_message = StatusMessage::from(String::new());
+        if result.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(result))
     }
 
     fn scroll(&mut self) {

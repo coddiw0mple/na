@@ -7,7 +7,7 @@ use std::io::{Error, Write};
 pub struct Document {
     lines: Vec<Line>,
     pub filename: Option<String>,
-    pub new: bool,
+    pub name: bool,
 }
 
 impl Document {
@@ -22,7 +22,7 @@ impl Document {
         Ok(Self {
             lines,
             filename: Some(filename.to_string()),
-            new: false,
+            name: true,
         })
     }
 
@@ -32,7 +32,7 @@ impl Document {
         Self {
             lines,
             filename: Some(filename.to_string()),
-            new: true,
+            name: true,
         }
     }
 
