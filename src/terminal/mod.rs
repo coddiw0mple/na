@@ -47,7 +47,7 @@ impl Terminal {
     }
 
     pub fn size(&self) -> &Size {
-        &self.size  
+        &self.size
     }
 
     pub fn clear_screen() {

@@ -15,6 +15,7 @@ use crate::Line;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
+const QUIT_TIMES: u8 = 1;
 
 pub enum State {
     Normal,
@@ -50,6 +51,7 @@ pub struct Editor {
     document: Document,
     offset: Position,
     status_message: StatusMessage,
+    quit_times: u8,
 }
 
 impl Editor {
@@ -78,6 +80,7 @@ impl Editor {
             document,
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
+            quit_times: QUIT_TIMES,
         }
     }
 
@@ -119,12 +122,18 @@ impl Editor {
         let width = self.terminal.size().width as usize;
         let mut filename = "[untitled]".to_string();
 
+        let modified_indicator = if self.document.is_changed() {
+            " (changed)"
+        } else {
+            ""
+        };
+
         if let Some(name) = &self.document.filename {
             filename = name.clone();
             filename.truncate(20);
         }
 
-        status = format!(" {} - {} lines", filename, self.document.len());
+        status = format!(" {} - {} lines{}", filename, self.document.len(), modified_indicator);
         let line_indicator = format!(
             "{}/{}",
             self.cur_pos.y.saturating_add(1),
@@ -159,7 +168,17 @@ impl Editor {
         let key = Terminal::read_key()?;
 
         match key {
-            Key::Esc => self.quit = true,
+            Key::Esc => {
+                if self.quit_times > 0 && self.document.is_changed() {
+                    self.status_message = StatusMessage::from(format!(
+                        "WARNING! File has unsaved changes. Press Esc {} more times to quit.",
+                        self.quit_times
+                    ));
+                    self.quit_times -= 1;
+                    return Ok(()); // Returning from here means we can check if user has successively pressed Esc 2 times. If not, another key gets pressed
+                }
+                self.quit = true
+            }
             Key::Char(c) => {
                 self.document.insert(&self.cur_pos, c);
 
@@ -184,6 +203,10 @@ impl Editor {
             _ => (),
         };
         self.scroll();
+        if self.quit_times < QUIT_TIMES {
+            self.quit_times = QUIT_TIMES;
+            self.status_message = StatusMessage::from(String::new());
+        }
         Ok(())
     }
 
@@ -218,7 +241,7 @@ impl Editor {
 
 
             match Terminal::read_key()? {
-                Key::Char('\n') => break,
+                Key::Char('\n') | Key::Ctrl('s') => break,
                 Key::Char(c) => {
                     if !c.is_control() {
                         result.push(c);

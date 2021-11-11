@@ -7,10 +7,13 @@ use std::io::{Error, Write};
 pub struct Document {
     lines: Vec<Line>,
     pub filename: Option<String>,
-    pub name: bool,
+    pub name: bool, // In case our file does not exist, we will still set name = true since we may want to name the file with the entered filename
+    pub changed: bool, // Has been changed since we opened it?
 }
 
 impl Document {
+
+    // Open file with supplied filename
     pub fn open(filename: &str) -> Result<Self, std::io::Error> {
         let data = fs::read_to_string(filename)?;
         let mut lines = Vec::new();
@@ -23,9 +26,11 @@ impl Document {
             lines,
             filename: Some(filename.to_string()),
             name: true,
+            changed: false,
         })
     }
 
+    // Create new file with supplied filename
     pub fn new(filename: &str) -> Self {
         let lines = Vec::new();
 
@@ -33,10 +38,12 @@ impl Document {
             lines,
             filename: Some(filename.to_string()),
             name: true,
+            changed: false,
         }
     }
 
-    pub fn save(&self) -> Result<(), Error> {
+    // Saves to given filename in document struct
+    pub fn save(&mut self) -> Result<(), Error> {
 
         if let Some(filename) = &self.filename {
             let mut file = fs::File::create(filename)?;
@@ -44,11 +51,17 @@ impl Document {
                 file.write_all(line.as_bytes())?;
                 file.write_all(b"\n")?;
             }
+            self.changed = false;
         }
         Ok(())
     }
 
     pub fn insert(&mut self, at: &Position, c: char) {
+        if at.y > self.len() {
+            return;
+        }
+        self.changed = true;
+
         if c == '\n' {
             self.insert_newline(at);
             return;
@@ -57,7 +70,7 @@ impl Document {
             let mut line = Line::default();
             line.insert(0, c);
             self.lines.push(line);
-        } else if at.y < self.len() {
+        } else {
             let line = self.lines.get_mut(at.y).unwrap();
             line.insert(at.x, c);
         }
@@ -69,6 +82,7 @@ impl Document {
         if at.y >= len {
             return;
         }
+        self.changed = true;
 
         if at.x == self.lines.get(at.y).unwrap().len() && at.y < len - 1 {
             let next_line = self.lines.remove(at.y + 1);
@@ -81,9 +95,6 @@ impl Document {
     }
 
     fn insert_newline(&mut self, at: &Position) {
-        if at.y > self.len() {
-            return;
-        }
 
         if at.y == self.len() {
             self.lines.push(Line::default());
@@ -103,5 +114,9 @@ impl Document {
 
     pub fn len(&self) -> usize {
         self.lines.len()
+    }
+
+    pub fn is_changed(&self) -> bool {
+        self.changed
     }
 }
