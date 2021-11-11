@@ -211,16 +211,14 @@ impl Editor {
     }
 
     fn save(&mut self) {
-        if self.document.filename.is_none() {
+        if self.document.filename.is_none() || self.document.name {
             let new_name = self.prompt("Save as: ").unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_string());
                 return;
             }
             self.document.filename = new_name;
-        } else if self.document.name == true {
-            self.document.filename = self.prompt("Save as: ").unwrap_or(None);
-        }
+        } 
 
         if self.document.save().is_ok() {
             self.status_message = StatusMessage::from("File saved successfully.".to_string());
@@ -254,7 +252,7 @@ impl Editor {
                 }
                 Key::Esc => {
                     result.truncate(0);
-                    break;
+                    return Ok(None);
                 }
                 _ => (),
             }
