@@ -119,7 +119,7 @@ impl Editor {
 
     fn draw_status_bar(&self) {
         let mut status;
-        let width = self.terminal.size().width as usize;
+        let width = self.terminal.size.width() as usize;
         let mut filename = "[untitled]".to_string();
 
         let modified_indicator = if self.document.is_changed() {
@@ -159,7 +159,7 @@ impl Editor {
         let message = &self.status_message;
         if Instant::now() - message.time < Duration::new(5, 0) {
             let mut text = message.text.clone();
-            text.truncate(self.terminal.size().width as usize);
+            text.truncate(self.terminal.size.width() as usize);
             print!("{}", text);
         }
     }
@@ -269,8 +269,8 @@ impl Editor {
 
     fn scroll(&mut self) {
         let Position{ x, y} = self.cur_pos;
-        let width = self.terminal.size().width as usize;
-        let height = self.terminal.size().height as usize;
+        let width = self.terminal.size.width() as usize;
+        let height = self.terminal.size.height() as usize;
         let mut offset = &mut self.offset;
 
         if y < offset.y {
@@ -373,7 +373,7 @@ impl Editor {
     fn draw_welcome(&self, welcome_message: &mut String) {
 
         Terminal::clear_current_line();
-        let width = self.terminal.size().width as usize;
+        let width = self.terminal.size.width() as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
@@ -384,7 +384,7 @@ impl Editor {
     }
 
     fn draw_line(&self, line: &Line) {
-        let width = self.terminal.size().width as usize;
+        let width = self.terminal.size.width() as usize;
         let start = self.offset.x;
         let end = self.offset.x + width;
 
@@ -393,7 +393,7 @@ impl Editor {
     }
 
     fn draw_lines(&self) {
-        let height = self.terminal.size().height;
+        let height = self.terminal.size.height();
 
         for term_line in 0..height {
             Terminal::clear_current_line();

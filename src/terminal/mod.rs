@@ -4,6 +4,7 @@ use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::event::Key;
 use termion::color;
+use termion::screen::AlternateScreen;
 
 use crate::state::Position;
 
@@ -12,9 +13,21 @@ pub struct  Size {
     pub width: u16,
 }
 
-pub struct  Terminal {
-    size: Size,
-    _stdout: RawTerminal<std::io::Stdout>,
+impl Size {
+    pub fn height(&self) -> u16 {
+        let size = termion::terminal_size().unwrap();
+        size.1.saturating_sub(2)
+    }
+
+    pub fn width(&self) -> u16 {
+        let size = termion::terminal_size().unwrap();
+        size.0
+    }
+}
+
+pub struct Terminal {
+    pub size: Size,
+    pub _stdout: RawTerminal<AlternateScreen<std::io::Stdout>>,
 }
 
 impl Terminal {
@@ -26,7 +39,7 @@ impl Terminal {
                 height: size.1.saturating_sub(2),
                 width: size.0,
             },
-            _stdout: stdout().into_raw_mode()?,
+            _stdout: AlternateScreen::from(stdout()).into_raw_mode()?,
         })
     }
 
