@@ -9,6 +9,9 @@ use state::Editor;
 pub use state::line::Line;
 pub use state::document::Document;
 
+use std::thread;
+use std::time::Duration;
+
 fn main() {
     Editor::default().run();
 }

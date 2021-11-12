@@ -1,6 +1,6 @@
 /// The global editor state.
 use termion::event::Key;
-use std::env;
+use std::{env, thread};
 use std::time::Duration;
 use std::time::Instant;
 use termion::color;
@@ -85,6 +85,21 @@ impl Editor {
     }
 
     pub fn run(&mut self) {
+
+        /* Attempt at screen refresh on terminal resize
+        thread::spawn(move || {
+           loop {
+               let first_size = termion::terminal_size().unwrap();
+               thread::sleep(Duration::from_millis(50));
+               let second_size = termion::terminal_size().unwrap();
+
+               if first_size != second_size {
+                   &self.refresh_screen();
+               }
+           }
+        });
+        */
+
         loop {
             if let Err(error) = self.refresh_screen() {
                 die(&error);
@@ -98,12 +113,11 @@ impl Editor {
         }
     }
 
-    fn refresh_screen(&self) -> Result<(), std::io::Error> {
+    pub fn refresh_screen(&self) -> Result<(), std::io::Error> {
         Terminal::cursor_hide();
         Terminal::cursor_pos(&Position::default());
         if self.quit {
             Terminal::clear_screen();
-            println!("Goodbye!\r");
         } else {
             self.draw_lines();
             self.draw_status_bar();
