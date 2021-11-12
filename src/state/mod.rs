@@ -153,10 +153,10 @@ impl Editor {
             self.cur_pos.y.saturating_add(1),
             self.document.len()
         );
+
+        #[allow(clippy::integer_arithmetic)]
         let len = status.len() + line_indicator.len();
-        if width > len {
-            status.push_str(&" ".repeat(width - len - 2));
-        }
+        status.push_str(&" ".repeat(width.saturating_sub(len)));
 
         status = format!("{}{}  ", status, line_indicator);
         status.truncate(width);
@@ -259,11 +259,7 @@ impl Editor {
                         result.push(c);
                     }
                 },
-                Key::Backspace => {
-                    if result.len() > 0 {
-                        result.remove(result.len() - 1);
-                    }
-                }
+                Key::Backspace => result.truncate(result.len().saturating_sub(1)),
                 Key::Esc => {
                     result.truncate(0);
                     return Ok(None);
@@ -337,14 +333,14 @@ impl Editor {
             },
             Key::PageUp => {
                 y = if y > terminal_height {
-                    y - terminal_height
+                    y.saturating_sub(terminal_height)
                 } else {
                     0
                 }
             },
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
-                    y + terminal_height as usize
+                    y.saturating_add(terminal_height)
                 } else {
                     height
                 }
@@ -398,7 +394,7 @@ impl Editor {
     fn draw_line(&self, line: &Line) {
         let width = self.terminal.size.width() as usize;
         let start = self.offset.x;
-        let end = self.offset.x + width;
+        let end = self.offset.x.saturating_add(width);
 
         let line = line.render(start, end);
         println!("{}\r", line);
@@ -410,7 +406,7 @@ impl Editor {
         for term_line in 0..height {
             Terminal::clear_current_line();
 
-            if let Some(line) = self.document.line(term_line as usize + self.offset.y) {
+            if let Some(line) = self.document.line(self.offset.y.saturating_add(term_line as usize)) {
                 self.draw_line(line);
             } else if self.document.is_empty() && term_line == height/3 {
                 self.process_welcome();

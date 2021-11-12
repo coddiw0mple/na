@@ -76,6 +76,7 @@ impl Document {
         }
     }
 
+    #[allow(clippy::integer_arithmetic)]
     pub fn delete(&mut self, at: &Position) {
         let len = self.len();
 
@@ -84,7 +85,7 @@ impl Document {
         }
         self.changed = true;
 
-        if at.x == self.lines.get(at.y).unwrap().len() && at.y < len - 1 {
+        if at.x == self.lines.get(at.y).unwrap().len() && at.y + 1 < len {
             let next_line = self.lines.remove(at.y + 1);
             let line = self.lines.get_mut(at.y).unwrap();
             line.append(&next_line);
@@ -96,11 +97,16 @@ impl Document {
 
     fn insert_newline(&mut self, at: &Position) {
 
+        if at.y > self.len() {
+            return;
+        }
+
         if at.y == self.len() {
             self.lines.push(Line::default());
         }
 
         let new_line = self.lines.get_mut(at.y).unwrap().split(at.x);
+        #[allow(clippy::integer_arithmetic)]
         self.lines.insert(at.y + 1, new_line);
     }
 
