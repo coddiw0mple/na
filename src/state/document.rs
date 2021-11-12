@@ -57,7 +57,7 @@ impl Document {
     }
 
     pub fn insert(&mut self, at: &Position, c: char) {
-        if at.y > self.len() {
+        if at.y > self.lines.len() {
             return;
         }
         self.changed = true;
@@ -66,46 +66,48 @@ impl Document {
             self.insert_newline(at);
             return;
         }
-        if at.y == self.len() {
+        if at.y == self.lines.len() {
             let mut line = Line::default();
             line.insert(0, c);
             self.lines.push(line);
         } else {
-            let line = self.lines.get_mut(at.y).unwrap();
+            #[allow(clippy::indexing_slicing)]
+            let line = &mut self.lines[at.y];
             line.insert(at.x, c);
         }
     }
 
-    #[allow(clippy::integer_arithmetic)]
+    #[allow(clippy::integer_arithmetic, clippy::indexing_slicing)]
     pub fn delete(&mut self, at: &Position) {
-        let len = self.len();
+        let len = self.lines.len();
 
         if at.y >= len {
             return;
         }
         self.changed = true;
 
-        if at.x == self.lines.get(at.y).unwrap().len() && at.y + 1 < len {
+        if at.x == self.lines[at.y].len() && at.y + 1 < len {
             let next_line = self.lines.remove(at.y + 1);
-            let line = self.lines.get_mut(at.y).unwrap();
+            let line = &mut self.lines[at.y];
             line.append(&next_line);
         } else {
-            let line = self.lines.get_mut(at.y).unwrap();
+            let line = &mut self.lines[at.y];
             line.delete(at.x);
         }
     }
 
     fn insert_newline(&mut self, at: &Position) {
 
-        if at.y > self.len() {
+        if at.y > self.lines.len() {
             return;
         }
 
-        if at.y == self.len() {
+        if at.y == self.lines.len() {
             self.lines.push(Line::default());
         }
 
-        let new_line = self.lines.get_mut(at.y).unwrap().split(at.x);
+        #[allow(clippy::indexing_slicing)]
+        let new_line = self.lines[at.y].split(at.x);
         #[allow(clippy::integer_arithmetic)]
         self.lines.insert(at.y + 1, new_line);
     }

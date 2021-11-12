@@ -60,11 +60,11 @@ impl Editor {
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from(" HELP: Ctrl-s = save | Esc = quit");
 
-        let document = if args.len() > 1 {
-            let file_name = &args[1];
-            let doc = Document::open(&file_name);
-            if doc.is_ok() {
-                doc.unwrap()
+        let document = if let Some(file_name) = args.get(1) {
+            let doc = Document::open(file_name);
+
+            if let Ok(doc) = doc {
+                doc
             } else {
                 initial_status = format!("ERR: Could not open file: {}", file_name);
                 Document::new(file_name)
@@ -189,7 +189,9 @@ impl Editor {
                         self.quit_times
                     ));
                     self.quit_times -= 1;
-                    return Ok(()); // Returning from here means we can check if user has successively pressed Esc 2 times. If not, another key gets pressed
+                    return Ok(());  // Returning from here means we can check if user has
+                                    // successively pressed Esc 2 times. If not, another key gets
+                                    // pressed
                 }
                 self.quit = true
             }
@@ -235,7 +237,10 @@ impl Editor {
         } 
 
         if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully.".to_string());
+            self.status_message = StatusMessage::from(
+                "File saved successfully."
+                    .to_string()
+            );
         } else {
             self.status_message = StatusMessage::from("Error writing file!".to_string());
         }
@@ -383,6 +388,7 @@ impl Editor {
         Terminal::clear_current_line();
         let width = self.terminal.size.width() as usize;
         let len = welcome_message.len();
+        #[allow(clippy::integer_arithmetic, clippy::integer_division)]
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
 
@@ -400,13 +406,17 @@ impl Editor {
         println!("{}\r", line);
     }
 
+    #[allow(clippy::integer_division, clippy::integer_arithmetic)]
     fn draw_lines(&self) {
         let height = self.terminal.size.height();
 
         for term_line in 0..height {
             Terminal::clear_current_line();
 
-            if let Some(line) = self.document.line(self.offset.y.saturating_add(term_line as usize)) {
+            if let Some(line) = self
+                .document
+                .line(self.offset.y.saturating_add(term_line as usize))
+            {
                 self.draw_line(line);
             } else if self.document.is_empty() && term_line == height/3 {
                 self.process_welcome();

@@ -9,12 +9,10 @@ pub struct Line {
 
 impl From<&str> for Line {
     fn from(slice: &str) -> Self {
-        let mut line = Self {
+        Self {
             string: String::from(slice),
-            len: 0,
-        };
-        line.update_len();
-        line
+            len: slice.graphemes(true).count(),
+        }
     }
 }
 
