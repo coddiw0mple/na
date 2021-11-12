@@ -1,6 +1,14 @@
 1. Search
 2. Syntax highlighting
 3. State Management
-4. Width re-calculation upon terminal resizing for status bar
+4. Width re-calculation upon terminal resizing for status bar (concurrent stdin and rendering)
 5. Multiple file editing
 6. More colors (red for errors, etc)
+
+
+LONG TERM:
+1. Builtin concurrency like vim jobs and channels
+2. Tab complete commands
+3. Multiple cursor manipulation (like kakuone)
+4. Integration with scripts
+5. IDE-like features we find in modern editors like automatic tabs, etc

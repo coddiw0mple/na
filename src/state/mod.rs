@@ -360,7 +360,7 @@ impl Editor {
         };
 
         if x > width + 1 {
-            x = width + 1;
+            x = width;
         }
 
         self.cur_pos = Position {x, y};
