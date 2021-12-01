@@ -77,6 +77,18 @@ impl Document {
         }
     }
 
+    pub fn find(&self, query: &str, after: &Position) -> Option<Position> {
+        let mut x = after.x;
+
+        for (y, line) in self.lines.iter().enumerate().skip(after.y) {
+            if let Some(x) = line.find(query, x) {
+                return Some(Position { x, y });
+            }
+            x = 0;
+        }
+        None
+    }
+
     #[allow(clippy::integer_arithmetic, clippy::indexing_slicing)]
     pub fn delete(&mut self, at: &Position) {
         let len = self.lines.len();

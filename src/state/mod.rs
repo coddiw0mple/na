@@ -1,6 +1,6 @@
 /// The global editor state.
 use termion::event::Key;
-use std::{env, thread};
+use std::env;
 use std::time::Duration;
 use std::time::Instant;
 use termion::color;
@@ -38,7 +38,7 @@ impl StatusMessage {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -58,7 +58,7 @@ impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from(" HELP: Ctrl-s = save | Esc = quit");
+        let mut initial_status = String::from(" HELP: Ctrl-F | Ctrl-s = save | Esc = quit");
 
         let document = if let Some(file_name) = args.get(1) {
             let doc = Document::open(file_name);
@@ -195,6 +195,7 @@ impl Editor {
                 }
                 self.quit = true
             }
+            Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
                 self.document.insert(&self.cur_pos, c);
 
@@ -228,7 +229,7 @@ impl Editor {
 
     fn save(&mut self) {
         if self.document.filename.is_none() || self.document.name {
-            let new_name = self.prompt("Save as: ").unwrap_or(None);
+            let new_name = self.prompt("Save as: ", |_, _, _| {}, true).unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_string());
                 return;
@@ -246,18 +247,54 @@ impl Editor {
         }
     }
 
-    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
+    fn search(&mut self) {
+        {
+            let prev_pos = self.cur_pos.clone();
+            if let Some(query) = self.prompt("Search(ESC to cancel, Arrows to navigate): ", |editor, key, query| {
+                let mut moved = false;
+                match key {
+                    Key::Right | Key::Down => {
+                        editor.move_cursor(Key::Right);
+                         moved = true;
+                    }
+                    _ => (),
+                }
+                if let Some(position) = editor.document.find(&query, &editor.cur_pos) {
+                    editor.cur_pos = position;
+                    editor.scroll();
+                } else if moved {
+                    editor.move_cursor(Key::Left);
+                }
+            },false).unwrap_or(None)
+            {
+                if let Some(position) = self.document.find(&query[..], &prev_pos) {
+                    self.cur_pos = position;
+                } else {
+                    self.status_message = StatusMessage::from(format!("Not found :{}", query));
+                }
+            } else {
+                self.cur_pos = prev_pos;
+                self.scroll();
+                self.status_message = StatusMessage::from(format!("Search cancelled"));
+            }
+        }
+    }
+
+    fn prompt<C>(&mut self, prompt: &str, callback: C, show_name: bool) -> Result<Option<String>, std::io::Error>
+    where
+        C: Fn(&mut Self, Key, &String),
+    {
         let mut result = String::new();
 
-        if self.document.name {
+        if self.document.name && show_name {
             result = String::from(self.document.filename.as_ref().unwrap());
         }
         loop {
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
             self.refresh_screen()?;
 
-
-            match Terminal::read_key()? {
+            let key = Terminal::read_key()?;
+            match key {
                 Key::Char('\n') | Key::Ctrl('s') => break,
                 Key::Char(c) => {
                     if !c.is_control() {
@@ -271,6 +308,7 @@ impl Editor {
                 }
                 _ => (),
             }
+            callback(self, key, &result);
         }
 
         self.status_message = StatusMessage::from(String::new());
