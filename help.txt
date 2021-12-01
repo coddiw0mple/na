@@ -1,3 +1,12 @@
+// PRESENT COMMANDS
+
+Ctrl-F: Search
+Ctrl-S: Save-as
+Esc:    Exit
+
+
+// THESE ARE FUTURE COMMANDS
+
 Sodium: A modern editor for the Redox OS
 ========================================
 by Ticki et al.
