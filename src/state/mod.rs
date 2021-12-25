@@ -54,6 +54,12 @@ pub struct Editor {
     quit_times: u8,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
+
 impl Editor {
 
     pub fn default() -> Self {
@@ -250,29 +256,27 @@ impl Editor {
     fn search(&mut self) {
         {
             let prev_pos = self.cur_pos.clone();
-            if let Some(query) = self.prompt("Search(ESC to cancel, Arrows to navigate): ", |editor, key, query| {
+            let mut direction = SearchDirection::Forward;
+            let query = self.prompt("Search(ESC to cancel, Arrows to navigate): ", |editor, key, query| {
                 let mut moved = false;
                 match key {
                     Key::Right | Key::Down => {
+                        direction = SearchDirection::Forward;
                         editor.move_cursor(Key::Right);
-                         moved = true;
+                        moved = true;
                     }
-                    _ => (),
+                    Key::Left | Key::Up => direction = SearchDirection::Backward,
+                    _ => direction = SearchDirection::Forward,
                 }
-                if let Some(position) = editor.document.find(&query, &editor.cur_pos) {
+                if let Some(position) = editor.document.find(&query, &editor.cur_pos, direction) {
                     editor.cur_pos = position;
                     editor.scroll();
                 } else if moved {
                     editor.move_cursor(Key::Left);
                 }
-            },false).unwrap_or(None)
-            {
-                if let Some(position) = self.document.find(&query[..], &prev_pos) {
-                    self.cur_pos = position;
-                } else {
-                    self.status_message = StatusMessage::from(format!("Not found :{}", query));
-                }
-            } else {
+            },false).unwrap_or(None);
+
+            if query.is_none() {
                 self.cur_pos = prev_pos;
                 self.scroll();
                 self.status_message = StatusMessage::from(format!("Search cancelled"));
@@ -280,9 +284,9 @@ impl Editor {
         }
     }
 
-    fn prompt<C>(&mut self, prompt: &str, callback: C, show_name: bool) -> Result<Option<String>, std::io::Error>
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C, show_name: bool) -> Result<Option<String>, std::io::Error>
     where
-        C: Fn(&mut Self, Key, &String),
+        C: FnMut(&mut Self, Key, &String),
     {
         let mut result = String::new();
 

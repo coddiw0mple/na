@@ -1,6 +1,6 @@
 use crate::Line;
 use std::fs;
-use crate::state::Position;
+use crate::state::{Position, SearchDirection};
 use std::io::{Error, Write};
 
 #[derive(Default)]
@@ -77,14 +77,40 @@ impl Document {
         }
     }
 
-    pub fn find(&self, query: &str, after: &Position) -> Option<Position> {
-        let mut x = after.x;
+    #[allow(clippy::indexing_slicing)]
+    pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
+        if at.y >= self.lines.len() {
+            return None;
+        }
+        let mut pos = Position { x: at.x, y: at.y};
 
-        for (y, line) in self.lines.iter().enumerate().skip(after.y) {
-            if let Some(x) = line.find(query, x) {
-                return Some(Position { x, y });
+        let start = if direction == SearchDirection::Forward {
+            at.y
+        } else {
+            0
+        };
+        let end = if direction == SearchDirection::Forward {
+            self.lines.len()
+        } else {
+            at.y.saturating_add(1)
+        };
+
+        for _ in start..end {
+            if let Some(line) = self.lines.get(pos.y) {
+                if let Some(x) = line.find(&query, pos.x, direction) {
+                    pos.x = x;
+                    return Some(pos);
+                }
+                if direction == SearchDirection::Forward {
+                    pos.y = pos.y.saturating_add(1);
+                    pos.x = 0;
+                } else {
+                    pos.y = pos.y.saturating_sub(1);
+                    pos.x = self.lines[pos.y].len();
+                }
+            } else {
+                return None;
             }
-            x = 0;
         }
         None
     }

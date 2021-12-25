@@ -21,6 +21,7 @@ use state::Editor;
 
 pub use state::line::Line;
 pub use state::document::Document;
+pub use state::SearchDirection;
 
 fn main() {
     Editor::default().run();
