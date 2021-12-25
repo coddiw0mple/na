@@ -1,6 +1,6 @@
 // PRESENT COMMANDS
 
-Ctrl-F: Search
+Ctrl-F: Search (Arrow keys to jump between search results)
 Ctrl-S: Save-as
 Esc:    Exit
 
